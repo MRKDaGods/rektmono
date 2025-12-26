@@ -1,8 +1,9 @@
 #pragma once
 
 #include "../logger.h"
+#include "runtime.h"
 #include "remote_args.h"
-#include "remote_string.h"
+#include "remote_alloc.h"
 
 #include <Windows.h>
 #include <type_traits>
@@ -24,15 +25,15 @@ namespace mrk {
 
 		// Helper to process arguments: allocate strings and buffers, pass through everything else
 		template<typename T>
-		inline auto processArg(HANDLE hProc, RemoteStringManager& stringMgr, T&& arg) {
+		inline auto processArg(RemoteAllocationManager& allocMgr, T&& arg) {
 			if constexpr (std::is_same_v<std::decay_t<T>, RemoteBufferRequest>) {
 				// Allocate buffer in remote process
 				VLOG("Processing RemoteBufferRequest for automatic buffer allocation (%zu bytes)", arg.size);
-				return stringMgr.allocate(arg);
+				return allocMgr.allocate(arg);
 			} else if constexpr (is_string<std::decay_t<T>>::value) {
 				// Allocate string in remote process
 				VLOG("Processing string argument for remote allocation");
-				return stringMgr.allocate(arg);
+				return allocMgr.allocate(arg);
 			} else {
 				// Pass through
 				VLOG("Processing non-string argument (pass-through): 0x%p", (void*)arg);
@@ -41,36 +42,29 @@ namespace mrk {
 		}
 	}
 
-	// Forward declaration
-	bool executeRemoteFunction(HANDLE hProc, HANDLE hThread, RemoteFunction function, RemoteFunctionArgs& args, 
-		PDWORD result, size_t estimatedFunctionSize);
-
 	template<typename... Args>
-	inline bool callRemoteFunction(HANDLE hProc, HANDLE hThread, RemoteFunction function, Args&&... args) {
+	inline bool callRemoteFunction(HANDLE hProc, HANDLE hThread, const void* runtimeDataAddr, RemoteFunction function, Args&&... args) {
 		VLOG("callRemoteFunction: Starting with %zu arguments", sizeof...(Args));
 		
 		// Create string manager for automatic cleanup
-		RemoteStringManager stringMgr(hProc);
+		RemoteAllocationManager allocMgr(hProc);
 
 		// Process arguments
-		RemoteFunctionArgs funcArgs = packRemoteArgs(detail::processArg(hProc, stringMgr, std::forward<Args>(args))...);
-		
+		RemoteFunctionArgs funcArgs = packRemoteArgs(runtimeDataAddr, detail::processArg(allocMgr, std::forward<Args>(args))...);
+
 		VLOG("callRemoteFunction: Arguments packed, executing remote function");
-		
-		// Execute the function
 		return executeRemoteFunction(hProc, hThread, function, funcArgs, nullptr, static_cast<size_t>(-1));
 	}
 
 	// Overload with result capture
 	template<typename... Args>
-	inline bool callRemoteFunction(HANDLE hProc, HANDLE hThread, RemoteFunction function, PDWORD result, Args&&... args) {
+	inline bool callRemoteFunction(HANDLE hProc, HANDLE hThread, const void* runtimeDataAddr, RemoteFunction function, PDWORD result, Args&&... args) {
 		VLOG("callRemoteFunction: Starting with %zu arguments (with result capture)", sizeof...(Args));
 		
-		RemoteStringManager stringMgr(hProc);
-		RemoteFunctionArgs funcArgs = packRemoteArgs(detail::processArg(hProc, stringMgr, std::forward<Args>(args))...);
-		
-		VLOG("callRemoteFunction: Arguments packed, executing remote function");
-		
+		RemoteAllocationManager allocMgr(hProc);
+		RemoteFunctionArgs funcArgs = packRemoteArgs(runtimeDataAddr, detail::processArg(allocMgr, std::forward<Args>(args))...);
+
+		VLOG("callRemoteFunction: Arguments packed, executing remote function (result capture)");
 		return executeRemoteFunction(hProc, hThread, function, funcArgs, result, static_cast<size_t>(-1));
 	}
 }

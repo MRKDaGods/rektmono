@@ -1,15 +1,12 @@
 #pragma once
 
+#include "runtime.h"
 #include "remote_args.h"
 
 #include <Windows.h>
 #include <type_traits>
 
 namespace mrk {
-	// Forward declaration
-	bool executeRemoteFunction(HANDLE hProc, HANDLE hThread, RemoteFunction function, RemoteFunctionArgs& args, 
-		PDWORD result, size_t estimatedFunctionSize);
-	
 	// 4-argument API call
 	template<typename RetType, typename A1, typename A2, typename A3, typename A4>
 	struct RemoteApiCall4 {

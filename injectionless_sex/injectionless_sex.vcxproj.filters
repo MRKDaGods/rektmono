@@ -15,13 +15,16 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="demo-main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="runtime\runtime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="shellcode\shellcode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -35,7 +38,7 @@
     <ClInclude Include="logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="runtime\remote_string.h">
+    <ClInclude Include="runtime\remote_alloc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="runtime\remote_args.h">
@@ -45,6 +48,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="runtime\remote_api.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="runtime\remote_runtime_data.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

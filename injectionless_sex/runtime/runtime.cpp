@@ -1,9 +1,19 @@
 #include "runtime.h"
+#include "remote_runtime_data.h"
 #include "../logger.h"
 
 #include <TlHelp32.h>
+#include <unordered_set>
 
 namespace mrk {
+
+	/// Internally keep track of suspended procs
+	/// Winapi doesnt provide access to the suspension semaphore
+	std::unordered_set<DWORD> g_SuspendedPIDs;
+
+	void setSuspended(DWORD pid, bool suspended) { if (suspended) g_SuspendedPIDs.insert(pid); else g_SuspendedPIDs.erase(pid); }
+	bool isSuspended(DWORD pid) { return g_SuspendedPIDs.find(pid) != g_SuspendedPIDs.end(); }
+
 	HANDLE getProcessMainThread(HANDLE hProc) {
 		if (!hProc) {
 			VLOG("getProcessMainThread: Invalid process handle");
@@ -38,7 +48,8 @@ namespace mrk {
 				HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, threadEntry.th32ThreadID);
 				if (hThread) {
 					VLOG("getProcessMainThread: Successfully opened thread handle: %p", hThread);
-				} else {
+				}
+				else {
 					VLOG("getProcessMainThread: Failed to open thread. Error: %lu", GetLastError());
 				}
 				CloseHandle(hSnapshot);
@@ -54,9 +65,9 @@ namespace mrk {
 	// The way we will be executing remote functions
 	// is by hijacking threads, cuz thats cool
 	bool executeRemoteFunction(HANDLE hProc, HANDLE hThread, RemoteFunction function, RemoteFunctionArgs& args,
-		PDWORD result, size_t estimatedFunctionSize) {
+							   PDWORD result, size_t estimatedFunctionSize) {
 		LOG("Starting remote function execution...");
-		
+
 		if (!hProc || !function) {
 			LOG("Invalid parameters: hProc=%p, function=%p", hProc, function);
 			return false;
@@ -70,7 +81,8 @@ namespace mrk {
 				return false;
 			}
 			LOG("Successfully obtained main thread handle: %p", hThread);
-		} else {
+		}
+		else {
 			LOG("Using provided thread handle: %p", hThread);
 		}
 
@@ -111,17 +123,17 @@ namespace mrk {
 			reinterpret_cast<uintptr_t>(contextBase) + offsetof(RemoteExecutionContext, completionFlag));
 
 		VLOG("Patch addresses - Function: %p, Params: %p, ReturnCode: %p, CompletionFlag: %p",
-			patchSetup.remoteFunctionAddress, patchSetup.paramsAddress, 
-			patchSetup.returnCodeAddress, patchSetup.completionFlagAddress);
+			 patchSetup.remoteFunctionAddress, patchSetup.paramsAddress,
+			 patchSetup.returnCodeAddress, patchSetup.completionFlagAddress);
 
 		VLOG("Patching shellcode...");
 		patchShellcode(execContext.shellcode, patchSetup);
 
 		// Copy function and args
-		VLOG("Copying function (%zu bytes) and args to execution context...", 
-			min(estimatedFunctionSize, REMOTE_FUNCTION_SIZE));
-		VLOG("Args: arg[0]=0x%p, arg[1]=0x%p, arg[2]=0x%p, arg[3]=0x%p", 
-			(void*)args.args[0], (void*)args.args[1], (void*)args.args[2], (void*)args.args[3]);
+		VLOG("Copying function (%zu bytes) and args to execution context...",
+			 min(estimatedFunctionSize, REMOTE_FUNCTION_SIZE));
+		VLOG("Args: arg[0]=0x%p, arg[1]=0x%p, arg[2]=0x%p, arg[3]=0x%p",
+			 (void*)args.args[0], (void*)args.args[1], (void*)args.args[2], (void*)args.args[3]);
 		memcpy(&execContext.remoteFunction, reinterpret_cast<void*>(function), min(estimatedFunctionSize, REMOTE_FUNCTION_SIZE));
 		memcpy(&execContext.args, reinterpret_cast<void*>(&args), sizeof(RemoteFunctionArgs));
 
@@ -145,13 +157,18 @@ namespace mrk {
 
 		// Hijack thread
 		// Suspend, get context, set RIP to shellcode, set context, resume
-		LOG("Suspending target thread...");
-		if (SuspendThread(hThread) == (DWORD)-1) {
-			LOG("Failed to suspend thread. Error: %lu", GetLastError());
-			VirtualFreeEx(hProc, contextBase, 0, MEM_RELEASE);
-			return false;
+		DWORD pid = GetProcessId(hProc);
+		if (!isSuspended(pid)) {
+			LOG("Suspending target thread...");
+			if (SuspendThread(hThread) == (DWORD)-1) {
+				LOG("Failed to suspend thread. Error: %lu", GetLastError());
+				VirtualFreeEx(hProc, contextBase, 0, MEM_RELEASE);
+				return false;
+			}
+
+			setSuspended(pid, true);
+			VLOG("Thread suspended successfully.");
 		}
-		VLOG("Thread suspended successfully.");
 
 		VLOG("Getting thread context...");
 		CONTEXT threadCtx;
@@ -173,7 +190,7 @@ namespace mrk {
 		uintptr_t shellcodeAddress = reinterpret_cast<uintptr_t>(
 			reinterpret_cast<uint8_t*>(contextBase) + offsetof(RemoteExecutionContext, shellcode));
 		threadCtx.Rip = shellcodeAddress;
-		
+
 		LOG("Setting thread RIP to shellcode at: %p", (void*)shellcodeAddress);
 		if (!SetThreadContext(hThread, &threadCtx)) {
 			LOG("Failed to set thread context. Error: %lu", GetLastError());
@@ -185,6 +202,7 @@ namespace mrk {
 
 		LOG("Resuming thread to execute shellcode...");
 		ResumeThread(hThread);
+		setSuspended(pid, false);
 
 		// Wait for completion
 		LOG("Waiting for shellcode completion...");
@@ -235,6 +253,7 @@ namespace mrk {
 			VirtualFreeEx(hProc, contextBase, 0, MEM_RELEASE);
 			return false;
 		}
+		setSuspended(pid, true);
 
 		VLOG("Restoring original thread context (RIP: %p)...", (void*)originalThreadCtx.Rip);
 		if (!SetThreadContext(hThread, &originalThreadCtx)) {
@@ -247,6 +266,7 @@ namespace mrk {
 
 		VLOG("Resuming thread...");
 		ResumeThread(hThread);
+		setSuspended(pid, false);
 
 		// Return result
 		if (result) {
@@ -260,4 +280,118 @@ namespace mrk {
 		LOG("Remote function execution completed successfully.");
 		return true;
 	}
+
+	DWORD getProcessPID(const std::string& processName) {
+		LOG("Getting PID for process name: %s", processName.c_str());
+
+		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+		if (hSnapshot == INVALID_HANDLE_VALUE) {
+			LOG("Failed to create process snapshot. Error: %lu", GetLastError());
+			return 0;
+		}
+
+		PROCESSENTRY32 procEntry;
+		procEntry.dwSize = sizeof(PROCESSENTRY32);
+		if (!Process32First(hSnapshot, &procEntry)) {
+			LOG("Process32First failed. Error: %lu", GetLastError());
+			CloseHandle(hSnapshot);
+			return 0;
+		}
+
+		do {
+			if (processName == procEntry.szExeFile) {
+				DWORD pid = procEntry.th32ProcessID;
+				VLOG("Found process '%s' with PID: %lu", processName.c_str(), pid);
+				CloseHandle(hSnapshot);
+				return pid;
+			}
+		} while (Process32Next(hSnapshot, &procEntry));
+
+		VLOG("Process '%s' not found.", processName.c_str());
+		CloseHandle(hSnapshot);
+		return 0;
+	}
+
+	bool killProcess(DWORD pid) {
+		if (pid == 0) return false;
+
+		HANDLE hProc = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+		if (!hProc) {
+			LOG("Failed to open process %lu for termination. Error: %lu", pid, GetLastError());
+			return false;
+		}
+
+		if (!TerminateProcess(hProc, 0)) {
+			LOG("Failed to terminate process %lu. Error: %lu", pid, GetLastError());
+			CloseHandle(hProc);
+			return false;
+		}
+
+		CloseHandle(hProc);
+		return true;
+	}
+
+	bool createSuspendedProcess(const std::string& applicationPath, ProcessInfo* procInfo) {
+		STARTUPINFOA si;
+		ZeroMemory(&si, sizeof(si));
+		si.cb = sizeof(si);
+
+		PROCESS_INFORMATION pi;
+		ZeroMemory(&pi, sizeof(pi));
+
+		if (!CreateProcessA(
+			applicationPath.c_str(),
+			nullptr,
+			nullptr,
+			nullptr,
+			FALSE,
+			CREATE_SUSPENDED,
+			nullptr,
+			nullptr,
+			&si,
+			&pi
+		)) {
+			return false;
+		}
+
+		if (procInfo) {
+			*procInfo = pi;
+		}
+		else {
+			// If no proc info supplied, dont leak handles
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+		}
+
+		// Mark suspended
+		setSuspended(pi.dwProcessId, true);
+		return true;
+	}
+
+	RemoteRuntimeData createRuntimeData(HANDLE hProc) {
+		RemoteRuntimeData data{};
+		data.mrkapi.hProc = hProc;
+		return data;
+	}
+
+	bool allocateRuntimeData(HANDLE hProc, void** outDataAddress) {
+		if (!hProc || !outDataAddress) return false;
+
+		void* remoteAddr = VirtualAllocEx(hProc, nullptr, sizeof(RemoteRuntimeData), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+		if (!remoteAddr) {
+			LOG("Failed to allocate runtime data. Error: %lu", GetLastError());
+			return false;
+		}
+
+		RemoteRuntimeData runtimeData = createRuntimeData(hProc);
+		if (!WriteProcessMemory(hProc, remoteAddr, &runtimeData, sizeof(RemoteRuntimeData), nullptr)) {
+			LOG("Failed to write runtime data. Error: %lu", GetLastError());
+			return false;
+		}
+		VLOG("Allocated runtime data at %p", remoteAddr);
+
+		*outDataAddress = remoteAddr;
+		return true;
+	}
+
 }

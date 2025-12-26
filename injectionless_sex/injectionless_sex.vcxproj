@@ -127,6 +127,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="demo-main.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="runtime\runtime.cpp" />
     <ClCompile Include="shellcode\shellcode.cpp" />
@@ -134,9 +135,10 @@
   <ItemGroup>
     <ClInclude Include="logger.h" />
     <ClInclude Include="runtime\remote_api.h" />
+    <ClInclude Include="runtime\remote_runtime_data.h" />
     <ClInclude Include="runtime\remote_args.h" />
     <ClInclude Include="runtime\remote_call.h" />
-    <ClInclude Include="runtime\remote_string.h" />
+    <ClInclude Include="runtime\remote_alloc.h" />
     <ClInclude Include="runtime\runtime.h" />
     <ClInclude Include="shellcode\shellcode.h" />
   </ItemGroup>

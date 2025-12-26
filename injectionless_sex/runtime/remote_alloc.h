@@ -6,7 +6,11 @@
 #include <vector>
 
 namespace mrk {
-	// Special marker type for requesting automatic buffer allocation
+
+	/// Special marker type for requesting automatic buffer allocation
+	/// As well as objects...
+	/// 
+	/// E.g: MODULEINFO* mi = remoteBuffer(sizeof(MODULEINFO));
 	struct RemoteBufferRequest {
 		size_t size;
 		constexpr explicit RemoteBufferRequest(size_t sz) : size(sz) {}
@@ -15,6 +19,11 @@ namespace mrk {
 	// Helper function to create buffer requests
 	constexpr RemoteBufferRequest remoteBuffer(size_t size) {
 		return RemoteBufferRequest(size);
+	}
+
+	template<typename T>
+	constexpr RemoteBufferRequest remoteBuffer() {
+		return RemoteBufferRequest(sizeof(T));
 	}
 
 	// Helper class for managing a single string in remote process with RAII
@@ -173,13 +182,13 @@ namespace mrk {
 	};
 
 	// Manager for multiple remote strings and buffers with automatic cleanup
-	class RemoteStringManager {
+	class RemoteAllocationManager {
 	public:
-		RemoteStringManager(HANDLE hProc) : hProc_(hProc) {
-			VLOG("RemoteStringManager created for process: %p", hProc);
+		RemoteAllocationManager(HANDLE hProc) : hProc_(hProc) {
+			VLOG("RemoteAllocationManager created for process: %p", hProc);
 		}
 
-		~RemoteStringManager() {
+		~RemoteAllocationManager() {
 			cleanup();
 		}
 
@@ -192,7 +201,7 @@ namespace mrk {
 			
 			auto addr = reinterpret_cast<const char*>(remoteStr.address());
 			strings_.push_back(std::move(remoteStr));
-			VLOG("RemoteStringManager: Tracking %zu strings", strings_.size());
+			VLOG("RemoteAllocationManager: Tracking %zu strings", strings_.size());
 			return addr;
 		}
 
@@ -204,7 +213,7 @@ namespace mrk {
 			
 			auto addr = reinterpret_cast<const wchar_t*>(remoteStr.address());
 			strings_.push_back(std::move(remoteStr));
-			VLOG("RemoteStringManager: Tracking %zu strings", strings_.size());
+			VLOG("RemoteAllocationManager: Tracking %zu strings", strings_.size());
 			return addr;
 		}
 
@@ -215,19 +224,19 @@ namespace mrk {
 			
 			auto addr = remoteBuffer.address();
 			buffers_.push_back(std::move(remoteBuffer));
-			VLOG("RemoteStringManager: Tracking %zu buffers", buffers_.size());
+			VLOG("RemoteAllocationManager: Tracking %zu buffers", buffers_.size());
 			return addr;
 		}
 
 		// Clean up all allocated strings and buffers
 		void cleanup() {
 			if (!strings_.empty()) {
-				VLOG("RemoteStringManager: Cleaning up %zu strings", strings_.size());
+				VLOG("RemoteAllocationManager: Cleaning up %zu strings", strings_.size());
 				strings_.clear(); // Destructors will free memory
 			}
 
 			if (!buffers_.empty()) {
-				VLOG("RemoteStringManager: Cleaning up %zu buffers", buffers_.size());
+				VLOG("RemoteAllocationManager: Cleaning up %zu buffers", buffers_.size());
 				buffers_.clear(); // Destructors will free memory
 			}
 		}
@@ -237,4 +246,5 @@ namespace mrk {
 		std::vector<RemoteString> strings_;
 		std::vector<RemoteBuffer> buffers_;
 	};
+
 }

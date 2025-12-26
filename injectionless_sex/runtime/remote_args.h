@@ -6,17 +6,18 @@
 namespace mrk {
 	// Structure to hold remote function arguments
 	struct RemoteFunctionArgs {
-		uintptr_t args[16];
+		uintptr_t args[16]; // eshm3na 16?
 	};
 
 	// Remote function signature
 	typedef DWORD(__stdcall* RemoteFunction)(RemoteFunctionArgs* args);
 
-	// Macros for defining and accessing remote function arguments
-	#define REMOTE_FUNCTION(...) \
+// Macros for defining and accessing remote function arguments
+#define REMOTE_FUNCTION(...) \
 		static DWORD __stdcall __VA_ARGS__(mrk::RemoteFunctionArgs* __args__)
 
-	#define REMOTE_ARG(index, type) reinterpret_cast<type>(__args__->args[index])
+#define REMOTE_ARG(index, type) reinterpret_cast<type>(__args__->args[index])
+#define REMOTE_RUNTIME_DATA_ARG() REMOTE_ARG(0, struct mrk::RemoteRuntimeData*)
 
 	namespace detail {
 		template<typename T>
@@ -63,9 +64,14 @@ namespace mrk {
 
 	// Helper for packing arguments manually
 	template<typename... Args>
-	inline RemoteFunctionArgs packRemoteArgs(Args... args) {
+	inline RemoteFunctionArgs packRemoteArgs(const void* runtimeDataAddr, Args... args) {
 		RemoteFunctionArgs result{};
-		detail::packArgs<0>(result, args...);
+
+		// Keep at 0
+		detail::packArgs<0>(result, runtimeDataAddr);
+
+		// Pack remaining arguments
+		detail::packArgs<1>(result, args...);
 		return result;
 	}
 }
