@@ -61,6 +61,11 @@ namespace mrk {
 	inline bool callRemoteFunction(HANDLE hProc, HANDLE hThread, const void* runtimeDataAddr, RemoteFunction function, PDWORD result, Args&&... args) {
 		VLOG("callRemoteFunction: Starting with %zu arguments (with result capture)", sizeof...(Args));
 		
+		// Initialially zero out result
+		if (result) {
+			*result = static_cast<DWORD>(-1);
+		}
+
 		RemoteAllocationManager allocMgr(hProc);
 		RemoteFunctionArgs funcArgs = packRemoteArgs(runtimeDataAddr, detail::processArg(allocMgr, std::forward<Args>(args))...);
 

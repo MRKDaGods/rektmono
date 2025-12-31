@@ -10,23 +10,33 @@ namespace mrk {
 	/// Special marker type for requesting automatic buffer allocation
 	/// As well as objects...
 	/// 
-	/// E.g: MODULEINFO* mi = remoteBuffer(sizeof(MODULEINFO));
+	/// E.g: MODULEINFO* mi = stackalloc(sizeof(MODULEINFO));
 	struct RemoteBufferRequest {
 		size_t size;
-		constexpr explicit RemoteBufferRequest(size_t sz) : size(sz) {}
+		void* localAddr; // If valid, the buffer will be read back after the call
+
+		constexpr explicit RemoteBufferRequest(size_t sz, void* localAddr = nullptr) : size(sz), localAddr(localAddr) {}
 	};
 
-	// Helper function to create buffer requests
-	constexpr RemoteBufferRequest remoteBuffer(size_t size) {
-		return RemoteBufferRequest(size);
+	namespace remote {
+		/// Helper function to create buffer requests
+		constexpr RemoteBufferRequest stackalloc(size_t size) {
+			return RemoteBufferRequest(size);
+		}
+
+		template<typename T>
+		constexpr RemoteBufferRequest stackalloc() {
+			return RemoteBufferRequest(sizeof(T));
+		}
+
+		/// Output buffer request - indicates that the buffer will be read back after the call
+		template<typename T>
+		constexpr RemoteBufferRequest out(T* localAddr) {
+			return RemoteBufferRequest(sizeof(T), localAddr);
+		}
 	}
 
-	template<typename T>
-	constexpr RemoteBufferRequest remoteBuffer() {
-		return RemoteBufferRequest(sizeof(T));
-	}
-
-	// Helper class for managing a single string in remote process with RAII
+	/// Helper class for managing a single string in remote process with RAII
 	class RemoteString {
 	public:
 		RemoteString() : hProc_(nullptr), remoteAddr_(nullptr), size_(0) {}
@@ -105,20 +115,25 @@ namespace mrk {
 		size_t size_;
 	};
 
-	// Helper class for managing a writable buffer in remote process with RAII
+	/// Helper class for managing a writable buffer in remote process with RAII
 	class RemoteBuffer {
 	public:
-		RemoteBuffer() : hProc_(nullptr), remoteAddr_(nullptr), size_(0) {}
+		RemoteBuffer() : hProc_(nullptr), remoteAddr_(nullptr), size_(0), localAddr_(nullptr) {}
 		
-		RemoteBuffer(HANDLE hProc, size_t size) : hProc_(hProc), remoteAddr_(nullptr), size_(size) {
+		RemoteBuffer(HANDLE hProc, size_t size, void* localAddr) : hProc_(hProc), remoteAddr_(nullptr), size_(size), localAddr_(localAddr) {
 			if (hProc && size > 0) {
-				VLOG("Allocating remote buffer (%zu bytes)", size);
+				VLOG("Allocating %sremote buffer (%zu bytes)", localAddr ? "READ BACK " : "", size);
 				remoteAddr_ = VirtualAllocEx(hProc, nullptr, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 				if (remoteAddr_) {
 					// Zero-initialize the buffer
 					std::vector<uint8_t> zeros(size, 0);
 					WriteProcessMemory(hProc, remoteAddr_, zeros.data(), size, nullptr);
 					VLOG("Remote buffer allocated at: %p", remoteAddr_);
+
+					// Zero-initialize local buffer
+					if (localAddr_) {
+						ZeroMemory(localAddr_, size_);
+					}
 				} else {
 					VLOG("Failed to allocate remote buffer. Error: %lu", GetLastError());
 				}
@@ -126,12 +141,17 @@ namespace mrk {
 		}
 
 		~RemoteBuffer() {
+			// Read back if needed
+			if (localAddr_ && isValid()) {
+				read(localAddr_, size_);
+			}
+
 			free();
 		}
 
 		// Move semantics
 		RemoteBuffer(RemoteBuffer&& other) noexcept 
-			: hProc_(other.hProc_), remoteAddr_(other.remoteAddr_), size_(other.size_) {
+			: hProc_(other.hProc_), remoteAddr_(other.remoteAddr_), size_(other.size_), localAddr_(other.localAddr_) {
 			other.remoteAddr_ = nullptr;
 			other.size_ = 0;
 		}
@@ -142,9 +162,12 @@ namespace mrk {
 				hProc_ = other.hProc_;
 				remoteAddr_ = other.remoteAddr_;
 				size_ = other.size_;
+				localAddr_ = other.localAddr_;
+
 				other.remoteAddr_ = nullptr;
 				other.size_ = 0;
 			}
+
 			return *this;
 		}
 
@@ -160,13 +183,13 @@ namespace mrk {
 			}
 		}
 
-		// Read data back from the remote buffer
-		// TODO: Conditional buffer freeing, so that we can read data back from it
+		/// Read data back from the remote buffer
 		bool read(void* dest, size_t readSize = 0) const {
 			if (!remoteAddr_ || !dest) return false;
 			if (readSize == 0) readSize = size_;
 			if (readSize > size_) readSize = size_;
-			
+
+			VLOG("Reading back remote buffer (%zu bytes) to local address: %p", size_, localAddr_);
 			return ReadProcessMemory(hProc_, remoteAddr_, dest, readSize, nullptr) != FALSE;
 		}
 
@@ -179,9 +202,10 @@ namespace mrk {
 		HANDLE hProc_;
 		void* remoteAddr_;
 		size_t size_;
+		void* localAddr_;
 	};
 
-	// Manager for multiple remote strings and buffers with automatic cleanup
+	/// Manager for multiple remote strings and buffers with automatic cleanup
 	class RemoteAllocationManager {
 	public:
 		RemoteAllocationManager(HANDLE hProc) : hProc_(hProc) {
@@ -217,9 +241,9 @@ namespace mrk {
 			return addr;
 		}
 
-		// Allocate a buffer in remote process and track it
+		/// Allocate a buffer in remote process and track it
 		void* allocate(RemoteBufferRequest request) {
-			RemoteBuffer remoteBuffer(hProc_, request.size);
+			RemoteBuffer remoteBuffer(hProc_, request.size, request.localAddr);
 			if (!remoteBuffer.isValid()) return nullptr;
 			
 			auto addr = remoteBuffer.address();
@@ -228,7 +252,7 @@ namespace mrk {
 			return addr;
 		}
 
-		// Clean up all allocated strings and buffers
+		/// Clean up all allocated strings and buffers
 		void cleanup() {
 			if (!strings_.empty()) {
 				VLOG("RemoteAllocationManager: Cleaning up %zu strings", strings_.size());

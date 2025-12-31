@@ -55,7 +55,7 @@ int demo_main() {
 	
 	LOG("Calling CustomRemoteFunction with automatic buffer allocation...");
 	success = callRemoteFunction(pi.hProcess, pi.hThread, nullptr, CustomRemoteFunction, 
-		MessageBoxA, "xanz", "WORKS!", GetCurrentProcessId, wsprintfA, remoteBuffer(256), "Process ID: %lu");
+		MessageBoxA, "xanz", "WORKS!", GetCurrentProcessId, wsprintfA, remote::stackalloc(256), "Process ID: %lu");
 	LOG("Remote function call completed. Success: %d", (int)success);
 
 	Sleep(1000);

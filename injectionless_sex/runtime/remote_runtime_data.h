@@ -30,7 +30,7 @@ namespace mrk {
 		MRKAPI mrkapi;
 
 		/// For use by printf, etc
-		/// We can also use mrk::remoteBuffer(xxx) for dynamic allocation of buffers
+		/// We can also use mrk::stackalloc(xxx) for dynamic allocation of buffers
 		char buffer[256];
 	};
 

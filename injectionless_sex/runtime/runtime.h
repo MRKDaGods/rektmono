@@ -10,6 +10,7 @@
 #include <string>
 
 namespace mrk {
+
 	/// Short hand for PROCESS_INFORMATION
 	typedef PROCESS_INFORMATION ProcessInfo;
 
@@ -49,4 +50,5 @@ namespace mrk {
 		return false;
 #endif
 	}
+
 }

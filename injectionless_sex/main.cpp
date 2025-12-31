@@ -11,8 +11,9 @@
 REMOTE_FUNCTION(LoadMono) {
 	auto* runtimeData = REMOTE_RUNTIME_DATA_ARG();
 	auto* monoPath = REMOTE_ARG(1, const char*);
-	auto* monoLoadedFmt = REMOTE_ARG(2, const char*);
-	auto* monoModuleInfo = REMOTE_ARG(3, MODULEINFO*);
+	auto* monoModuleInfo = REMOTE_ARG(2, MODULEINFO*);
+	auto* outMonoHandle = REMOTE_ARG(3, HMODULE*);
+	auto** outMonoBaseAddr = REMOTE_ARG(4, void**);
 
 	HMODULE hMono = runtimeData->winapi.LoadLibraryA(monoPath);
 	if (!hMono) {
@@ -22,6 +23,8 @@ REMOTE_FUNCTION(LoadMono) {
 	// My dumbass forgot that we dont allocate stack space
 	// Spent ~1hr figuring out why K32GetModuleInformation was crashing
 	// TLDR: Use auto* monoModuleInfo = REMOTE_ARG(3, MODULEINFO*); instead of allocating it on stack
+
+	// TODO: Disasm method at runtime & allocate sufficient stack space
 
 	// Get mono base addr
 	if (!runtimeData->winapi.K32GetModuleInformation(
@@ -33,17 +36,33 @@ REMOTE_FUNCTION(LoadMono) {
 		return 2;
 	}
 
-	runtimeData->winapi.wsprintfA(
-		runtimeData->buffer,
-		monoLoadedFmt,
-		monoModuleInfo->lpBaseOfDll
-	);
+	*outMonoHandle = hMono;
+	*outMonoBaseAddr = monoModuleInfo->lpBaseOfDll;
+	return 0;
+}
 
-	runtimeData->winapi.MessageBoxA(
-		NULL,
-		runtimeData->buffer,
-		nullptr,
-		MB_OK
+typedef struct _MonoImage MonoImage;
+typedef int MonoImageOpenStatus;
+typedef MonoImage* (__fastcall* mono_image_open_from_data_t)(char* data, unsigned int data_len, int need_copy, MonoImageOpenStatus* status);
+typedef MonoImage* (__fastcall* mono_image_open_from_data_internal_t)(void* alc, char* data, unsigned int data_len, int need_copy, MonoImageOpenStatus* status, int refonly, int metadata_only, const char* name, const char* filename);
+typedef MonoImage* (__fastcall* do_mono_image_open_t)(void* alc, const char* fname, MonoImageOpenStatus* status, int care_about_cli, int care_about_pecoff, int refonly, int metadata_only, int load_from_context);
+
+REMOTE_FUNCTION(ResolveMonoProcs) {
+	auto* runtimeData = REMOTE_RUNTIME_DATA_ARG();
+
+	// mono_image_open_from_data is exported
+	auto hMono = REMOTE_ARG(1, HMODULE);
+	auto monoImageOpenFromDataProcName = REMOTE_ARG(2, const char*);
+	auto* outMonoImageOpenFromData = REMOTE_ARG(3, mono_image_open_from_data_t*);
+
+	// In newer Unity, mono inlines mono_image_open_from_data_internal inside its callers
+	// Crazy
+
+	*outMonoImageOpenFromData = reinterpret_cast<mono_image_open_from_data_t>(
+		runtimeData->winapi.GetProcAddress(
+			hMono,
+			monoImageOpenFromDataProcName
+		)
 	);
 
 	return 0;
@@ -93,14 +112,50 @@ int main() {
 	}
 
 	// Load up mono
-	mrk::callRemoteFunction(
+	HMODULE hMono;
+	void* monoBaseAddr;
+	DWORD result;
+	if (!mrk::callRemoteFunction(
 		procInfo.hProcess,
 		procInfo.hThread,
 		runtimeDataAddr,
 		LoadMono,
-		MONO_RELV_PATH,
-		"Mono loaded at address: %p", 
-		mrk::remoteBuffer<MODULEINFO>());
+		&result,
+		/* 1 */ 	MONO_RELV_PATH,
+		/* 2 */		mrk::remote::stackalloc<MODULEINFO>(),
+		/* 3 */		mrk::remote::out(&hMono),
+		/* 4 */		mrk::remote::out(&monoBaseAddr)
+	) || result != 0) {
+		LOG("Failed to load mono into target process. Result: %lu", result);
+		mrk::killProcess(procInfo.dwProcessId);
+		CloseHandle(procInfo.hThread);
+		CloseHandle(procInfo.hProcess);
+		return 1;
+	}
+
+	LOG("Mono loaded at 0x%p", monoBaseAddr);
+	LOG("Mono module handle: %p", (void*)hMono);
+
+	// Resolve mono procs
+	mono_image_open_from_data_t monoImageOpenFromData;
+	if (!mrk::callRemoteFunction(
+		procInfo.hProcess,
+		procInfo.hThread,
+		runtimeDataAddr,
+		ResolveMonoProcs,
+		&result,
+		/* 1 */		hMono,
+		/* 2 */		"mono_image_open_from_data",
+		/* 3 */		mrk::remote::out(&monoImageOpenFromData)
+	) || result != 0) {
+		LOG("Failed to resolve mono procs. Result: %lu", result);
+		mrk::killProcess(procInfo.dwProcessId);
+		CloseHandle(procInfo.hThread);
+		CloseHandle(procInfo.hProcess);
+		return 1;
+	}
+
+	LOG("Resolved mono_image_open_from_data at address: %p", (void*)monoImageOpenFromData);
 
 	CloseHandle(procInfo.hThread);
 	CloseHandle(procInfo.hProcess);
