@@ -54,6 +54,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -129,20 +130,30 @@
   <ItemGroup>
     <ClCompile Include="demo-main.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="runtime\runtime.cpp" />
+    <ClCompile Include="mono.cpp" />
+    <ClCompile Include="remote\hook.cpp" />
+    <ClCompile Include="remote\string_patch.cpp" />
+    <ClCompile Include="remote\runtime.cpp" />
     <ClCompile Include="shellcode\shellcode.cpp" />
+    <ClCompile Include="utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="logger.h" />
-    <ClInclude Include="runtime\remote_api.h" />
-    <ClInclude Include="runtime\remote_runtime_data.h" />
-    <ClInclude Include="runtime\remote_args.h" />
-    <ClInclude Include="runtime\remote_call.h" />
-    <ClInclude Include="runtime\remote_alloc.h" />
-    <ClInclude Include="runtime\runtime.h" />
+    <ClInclude Include="mono.h" />
+    <ClInclude Include="remote\hook.h" />
+    <ClInclude Include="remote\winapi.h" />
+    <ClInclude Include="remote\runtime_data.h" />
+    <ClInclude Include="remote\args.h" />
+    <ClInclude Include="remote\call.h" />
+    <ClInclude Include="remote\alloc.h" />
+    <ClInclude Include="remote\string_patch.h" />
+    <ClInclude Include="remote\runtime.h" />
     <ClInclude Include="shellcode\shellcode.h" />
+    <ClInclude Include="utils\nmd_assembly.h" />
+    <ClInclude Include="utils\utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
 </Project>

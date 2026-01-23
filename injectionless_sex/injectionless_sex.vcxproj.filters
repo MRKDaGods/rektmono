@@ -18,7 +18,7 @@
     <ClCompile Include="demo-main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="runtime\runtime.cpp">
+    <ClCompile Include="remote\runtime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="shellcode\shellcode.cpp">
@@ -27,9 +27,21 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="remote\hook.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="remote\string_patch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="utils\utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mono.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="runtime\runtime.h">
+    <ClInclude Include="remote\runtime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="shellcode\shellcode.h">
@@ -38,19 +50,34 @@
     <ClInclude Include="logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="runtime\remote_alloc.h">
+    <ClInclude Include="remote\alloc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="runtime\remote_args.h">
+    <ClInclude Include="remote\args.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="runtime\remote_call.h">
+    <ClInclude Include="remote\call.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="runtime\remote_api.h">
+    <ClInclude Include="remote\winapi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="runtime\remote_runtime_data.h">
+    <ClInclude Include="remote\runtime_data.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="remote\hook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\nmd_assembly.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="remote\string_patch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mono.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

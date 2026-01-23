@@ -2,15 +2,15 @@
 
 #include "../logger.h"
 #include "runtime.h"
-#include "remote_args.h"
-#include "remote_alloc.h"
+#include "args.h"
+#include "alloc.h"
 
 #include <Windows.h>
 #include <type_traits>
 
 namespace mrk {
 	namespace detail {
-		// Type traits to detect string types
+		/// Type traits to detect string types
 		template<typename T>
 		struct is_string : std::false_type {};
 		
@@ -23,7 +23,7 @@ namespace mrk {
 		template<size_t N> struct is_string<const wchar_t[N]> : std::true_type {};
 		template<size_t N> struct is_string<wchar_t[N]> : std::true_type {};
 
-		// Helper to process arguments: allocate strings and buffers, pass through everything else
+		/// Helper to process arguments: allocate strings and buffers, pass through everything else
 		template<typename T>
 		inline auto processArg(RemoteAllocationManager& allocMgr, T&& arg) {
 			if constexpr (std::is_same_v<std::decay_t<T>, RemoteBufferRequest>) {
@@ -56,7 +56,7 @@ namespace mrk {
 		return executeRemoteFunction(hProc, hThread, function, funcArgs, nullptr, static_cast<size_t>(-1));
 	}
 
-	// Overload with result capture
+	/// Overload with result capture
 	template<typename... Args>
 	inline bool callRemoteFunction(HANDLE hProc, HANDLE hThread, const void* runtimeDataAddr, RemoteFunction function, PDWORD result, Args&&... args) {
 		VLOG("callRemoteFunction: Starting with %zu arguments (with result capture)", sizeof...(Args));

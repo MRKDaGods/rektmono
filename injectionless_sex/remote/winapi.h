@@ -1,13 +1,13 @@
 #pragma once
 
 #include "runtime.h"
-#include "remote_args.h"
+#include "args.h"
 
 #include <Windows.h>
 #include <type_traits>
 
 namespace mrk {
-	// 4-argument API call
+	/// 4-argument API call
 	template<typename RetType, typename A1, typename A2, typename A3, typename A4>
 	struct RemoteApiCall4 {
 		using FuncPtr = RetType(WINAPI*)(A1, A2, A3, A4);
@@ -23,7 +23,7 @@ namespace mrk {
 		}
 	};
 
-	// 3-argument API call
+	/// 3-argument API call
 	template<typename RetType, typename A1, typename A2, typename A3>
 	struct RemoteApiCall3 {
 		using FuncPtr = RetType(WINAPI*)(A1, A2, A3);
@@ -38,7 +38,7 @@ namespace mrk {
 		}
 	};
 
-	// 2-argument API call
+	/// 2-argument API call
 	template<typename RetType, typename A1, typename A2>
 	struct RemoteApiCall2 {
 		using FuncPtr = RetType(WINAPI*)(A1, A2);
@@ -52,7 +52,7 @@ namespace mrk {
 		}
 	};
 
-	// 1-argument API call
+	/// 1-argument API call
 	template<typename RetType, typename A1>
 	struct RemoteApiCall1 {
 		using FuncPtr = RetType(WINAPI*)(A1);
@@ -68,9 +68,9 @@ namespace mrk {
 		}
 	};
 
-	// Helper functions for calling Windows APIs remotely
+	/// Helper functions for calling Windows APIs remotely
 	
-	// Call a 4-argument Windows API without capturing result
+	/// Call a 4-argument Windows API without capturing result
 	template<typename RetType, typename A1, typename A2, typename A3, typename A4>
 	inline bool callRemoteApi(HANDLE hProc, HANDLE hThread, 
 		RetType(WINAPI* func)(A1, A2, A3, A4), A1 a1, A2 a2, A3 a3, A4 a4) {
@@ -86,7 +86,7 @@ namespace mrk {
 			RemoteApiCall4<RetType, A1, A2, A3, A4>::Invoke, args, &result, static_cast<size_t>(-1));
 	}
 
-	// Call a 4-argument Windows API with result capture
+	/// Call a 4-argument Windows API with result capture
 	template<typename RetType, typename A1, typename A2, typename A3, typename A4>
 	inline bool callRemoteApi(HANDLE hProc, HANDLE hThread, 
 		RetType(WINAPI* func)(A1, A2, A3, A4), A1 a1, A2 a2, A3 a3, A4 a4, RetType* outResult) {
@@ -107,7 +107,7 @@ namespace mrk {
 		return success;
 	}
 
-	// Call a 3-argument Windows API
+	/// Call a 3-argument Windows API
 	template<typename RetType, typename A1, typename A2, typename A3>
 	inline bool callRemoteApi(HANDLE hProc, HANDLE hThread, 
 		RetType(WINAPI* func)(A1, A2, A3), A1 a1, A2 a2, A3 a3, RetType* outResult = nullptr) {
@@ -127,7 +127,7 @@ namespace mrk {
 		return success;
 	}
 
-	// Call a 2-argument Windows API
+	/// Call a 2-argument Windows API
 	template<typename RetType, typename A1, typename A2>
 	inline bool callRemoteApi(HANDLE hProc, HANDLE hThread, 
 		RetType(WINAPI* func)(A1, A2), A1 a1, A2 a2, RetType* outResult = nullptr) {
@@ -146,7 +146,7 @@ namespace mrk {
 		return success;
 	}
 
-	// Call a 1-argument Windows API
+	/// Call a 1-argument Windows API
 	template<typename RetType, typename A1>
 	inline bool callRemoteApi(HANDLE hProc, HANDLE hThread, 
 		RetType(WINAPI* func)(A1), A1 a1, RetType* outResult = nullptr) {

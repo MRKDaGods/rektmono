@@ -1,6 +1,8 @@
 #include "runtime.h"
-#include "remote_runtime_data.h"
+#include "runtime_data.h"
+#include "args.h"
 #include "../logger.h"
+#include "../utils/utils.h"
 
 #include <TlHelp32.h>
 #include <unordered_set>
@@ -388,9 +390,96 @@ namespace mrk {
 			LOG("Failed to write runtime data. Error: %lu", GetLastError());
 			return false;
 		}
-		VLOG("Allocated runtime data at %p", remoteAddr);
+		VLOG("Allocated runtime data at 0x%p", remoteAddr);
 
 		*outDataAddress = remoteAddr;
+		return true;
+	}
+
+	bool allocatePersistentRemoteFunction(
+		HANDLE hProc,
+		PersistentRemoteFunction function,
+		void* runtimeDataAddr,
+		PersistentRemoteFunction* outFuncBase,
+		PersistentFunctionStringContext* outStringContext
+	) {
+		LOG("Allocating persistent remote function, local addr=0x%p, runtimeData=0x%p", function, runtimeDataAddr);
+
+		// Find function size
+		// Just look for RET since we only have leaf functions
+		// TODO: Update this when IAT fixup is implemented
+		size_t funcSize = 0;
+		while (function[funcSize++] != 0xC3);
+		LOG("Function size=%zu", funcSize);
+
+		printFunctionDisassembly(function);
+
+		// Create a working copy of the function
+		uint8_t* funcCopy = new uint8_t[funcSize];
+		memcpy(funcCopy, function, funcSize);
+		
+		// Patch runtime data placeholder
+		// Compiler already hardcodes the offsets so just look for DIEAFIFI..
+		// Assume RemoteRuntimeData never exceeds FFFFFFFF bytes
+		static_assert(sizeof(RemoteRuntimeData) <= 0xFFFFFFFF, "RemoteRuntimeData too big lol");
+
+		constexpr uintptr_t upperPlaceholder = EMBEDDED_RUNTIME_DATA_PLACEHOLDER >> 32; // 4 bytes right
+		for (size_t i = 0; i <= funcSize - sizeof(uintptr_t); i++) {
+			uintptr_t* potentialPlaceholder = reinterpret_cast<uintptr_t*>(funcCopy + i);
+			if ((*potentialPlaceholder >> 32) == upperPlaceholder) {
+				uintptr_t delta = *potentialPlaceholder - EMBEDDED_RUNTIME_DATA_PLACEHOLDER;
+				uintptr_t newDataAddr = reinterpret_cast<uintptr_t>(runtimeDataAddr) + delta;
+				LOG("Found embedded runtime data placeholder at offset 0x%zX, patching with 0x%zX", i, newDataAddr);
+				*potentialPlaceholder = newDataAddr;
+			}
+		}
+
+		// Allocate in remote process
+		size_t allocSize = static_cast<size_t>(std::ceilf(funcSize / 4096.f)) * 4096;
+		void* funcBase = VirtualAllocEx(hProc, nullptr, allocSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+		if (!funcBase) {
+			LOG("Failed to allocate remote function. Error: %lu", GetLastError());
+			delete[] funcCopy;
+			return false;
+		}
+		LOG("Allocated %zu bytes at 0x%p", allocSize, funcBase);
+
+		// Scan and patch string references
+		PersistentFunctionStringContext stringContext;
+		
+		// ana 7omarrrr
+		// This patches funcCopy directly
+		if (!scanAndPatchStrings(hProc,
+								 funcBase,	// Remote alloc base
+								 function,	// Original func buffer
+								 funcCopy,	// Patch buffer
+								 funcSize,
+								 &stringContext)) {
+			LOG("Failed to patch string references");
+			delete[] funcCopy;
+			return false;
+		}
+
+		// Write patched function
+		if (!WriteProcessMemory(hProc, funcBase, funcCopy, funcSize, nullptr)) {
+			LOG("Failed to write remote function. Error: %lu", GetLastError());
+			delete[] funcCopy;
+			VirtualFreeEx(hProc, funcBase, 0, MEM_RELEASE);
+			freePersistentFunctionStrings(hProc, stringContext);
+			return false;
+		}
+		LOG("Written patched remote function");
+
+		delete[] funcCopy;
+
+		if (outFuncBase) {
+			*outFuncBase = reinterpret_cast<PersistentRemoteFunction>(funcBase);
+		}
+
+		if (outStringContext) {
+			*outStringContext = stringContext;
+		}
+
 		return true;
 	}
 

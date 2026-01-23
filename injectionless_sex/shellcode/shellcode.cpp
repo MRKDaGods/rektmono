@@ -8,7 +8,7 @@ namespace mrk {
 	// 0xCCCCCCCCCCCCCCCC -> params address
 	// 0xDDDDDDDDDDDDDDDD -> return code address
 	// 0xEEEEEEEEEEEEEEEE -> completion flag address
-	uint8_t execShellcode[] = {
+	const uint8_t execShellcode[] = {
 		// Align stack
 		0x48, 0xB8, 0xF0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,		// mov    rax, -16
 		0x48, 0x21, 0xC4,												// and    rsp, rax
