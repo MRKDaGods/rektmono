@@ -9,19 +9,39 @@
 
 namespace mrk {
 
+	//int dumbmf = 0;
+
 	/// Checks if address lives inside rdata
-	bool sehSafeIsInRdata(uintptr_t address) {
-		return getSectionName(reinterpret_cast<void*>(address)) == ".rdata";
+	bool sehSafeIsInRdata(uintptr_t address, bool& imageBaseError) {
+		LOG("Checking if address 0x%zX is in .rdata section...", address);
+		std::string section = getSectionName(reinterpret_cast<void*>(address));
+		
+		/*if (dumbmf++ == 1) {
+			section = "<invalid>";
+		}*/
+
+		// Invalid image base means you fucked up :P
+		if (section == "<invalid>") {
+			// Cannot locate imagebase
+			// String allocations wont work
+			// Dont hook!
+			imageBaseError = true;
+			return false;
+
+			// throw std::runtime_error("Cannot locate image base!");
+		}
+
+		return section == ".rdata";
 	}
 
-	bool isLikelyStringPointer(uintptr_t address) {
+	bool isLikelyStringPointer(uintptr_t address, bool& imageBaseError) {
 		// If null or out of user va range
 		if (address == 0 || address > 0x00007FFF'FFFFFFFF) {
 			return false;
 		}
 
 		// Must be in rdata
-		if (!sehSafeIsInRdata(address)) {
+		if (!sehSafeIsInRdata(address, imageBaseError)) {
 			return false;
 		}
 
@@ -68,6 +88,7 @@ namespace mrk {
 		// Look for LEA instructions that load addresses from rdata
 		size_t offset = 0;
 		std::vector<StringReference> foundStrings;
+		bool imageBaseError = false;
 
 		while (offset < functionSize) {
 			nmd_x86_instruction instruction;
@@ -95,7 +116,7 @@ namespace mrk {
 				VLOG("Found LEA [rip+disp] at offset 0x%zX, displacement=%d, target=0x%p",
 					 offset, displacement, (void*)stringAddr);
 
-				if (isLikelyStringPointer(stringAddr)) {
+				if (isLikelyStringPointer(stringAddr, imageBaseError)) {
 					const char* str = reinterpret_cast<const char*>(stringAddr);
 					size_t strLen = strlen(str) + 1;
 
@@ -107,6 +128,11 @@ namespace mrk {
 
 					foundStrings.push_back(ref);
 					LOG("Found string via LEA at offset 0x%zX: \"%s\" (len=%zu)", offset, str, strLen);
+				}
+
+				// Fatal !!
+				if (imageBaseError) {
+					return false;
 				}
 			}
 

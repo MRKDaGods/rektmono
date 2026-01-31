@@ -1,7 +1,6 @@
 #include "remote/runtime.h"
-#include "remote/runtime_data.h"
-#include "remote/hook.h"
 #include "mono.h"
+#include "patch.h"
 
 #include <filesystem>
 #include <bit>
@@ -10,12 +9,6 @@
 #define TARGET_PROC_DIR "C:\\Users\\mamar\\Desktop\\Build"
 #define TARGET_PROC_NAME "UnityAssignment.exe"
 #define MONO_RELV_PATH "MonoBleedingEdge\\EmbedRuntime\\mono-2.0-bdwgc.dll"
-
-//REMOTE_HOOKED_FUNCTION(HookedMonoImageOpenFromData, char* data, unsigned int data_len, int need_copy, MonoImageOpenStatus* status, int refonly, const char* name) {
-//	auto* runtimeData = REMOTE_HOOKED_RUNTIME_DATA();
-//	runtimeData->winapi.MessageBoxA(nullptr, name, "XXX", MB_OK);
-//	return 0;
-//}
 
 int main() {
 	LOG("Injectionless sex - %s", __TIMESTAMP__);
@@ -72,35 +65,23 @@ int main() {
 		CloseHandle(procInfo.hProcess);
 		return 1;
 	}
+	LOG("Mono initialized successfully");
 
-	// Allocate hook function
-	// String references will be automatically patched
-	//mrk::PersistentRemoteFunction remoteHookedFunc;
-	//mrk::PersistentFunctionStringContext stringContext;
-	//if (!mrk::allocatePersistentRemoteFunction(
-	//	procInfo.hProcess,
-	//	reinterpret_cast<uint8_t*>(&HookedMonoImageOpenFromData),
-	//	runtimeDataAddr,
-	//	&remoteHookedFunc,
-	//	&stringContext // keep track for cleanup
-	//)) {
-	//	LOG("Failed to allocate persistent remote function");
-	//	mrk::killProcess(procInfo.dwProcessId);
-	//	CloseHandle(procInfo.hThread);
-	//	CloseHandle(procInfo.hProcess);
-	//	return 1;
-	//}
-
-	//LOG("Allocated hooked function at 0x%p", (void*)remoteHookedFunc);
-	//LOG("Patched %zu string references", stringContext.strings.size());
+	// Initialize hooks!
+	if (!mrk::patch::initialize(procInfo, runtimeDataAddr, &monoProcs)) {
+		LOG("Failed to initialize hooks");
+		mrk::killProcess(procInfo.dwProcessId);
+		CloseHandle(procInfo.hThread);
+		CloseHandle(procInfo.hProcess);
+		return 1;
+	}
+	LOG("Hooks initialized successfully");
 
 	//// Hook
 	//mrk::remoteHook(procInfo.hProcess, monoImageOpenFromDataWithName, remoteHookedFunc, nullptr);
 
-	// mrk::freePersistentFunctionStrings(procInfo.hProcess, stringContext);
-
 	// kill it
-	mrk::killProcess(procInfo.dwProcessId);
+	//mrk::killProcess(procInfo.dwProcessId);
 
 	CloseHandle(procInfo.hThread);
 	CloseHandle(procInfo.hProcess);

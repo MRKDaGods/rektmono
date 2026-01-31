@@ -36,7 +36,7 @@ namespace mrk {
 // For hooked functions that need embedded runtime data
 // The runtime data address will be patched into the function by allocatePersistentRemoteFunction
 #define REMOTE_HOOKED_FUNCTION(name, ...) \
-		static DWORD __stdcall name(__VA_ARGS__)
+		static uintptr_t __stdcall name(__VA_ARGS__)
 
 // Macro to access the embedded runtime data in hooked functions
 #define REMOTE_HOOKED_RUNTIME_DATA() mrk::__getRuntimeDataPtr()

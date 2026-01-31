@@ -39,6 +39,9 @@
     <ClCompile Include="mono.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="patch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="remote\runtime.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="mono.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="patch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

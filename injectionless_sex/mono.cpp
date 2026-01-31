@@ -15,7 +15,7 @@ namespace mrk::mono {
 		const char* monoRelativePath,
 		MonoProcs* monoProcs
 	) {
-		if (!monoProcs) {
+		if (!procInfo.hProcess || !procInfo.hThread || !runtimeDataAddr || !monoProcs) {
 			return false;
 		}
 
@@ -24,17 +24,17 @@ namespace mrk::mono {
 		void* monoBaseAddr;
 		size_t monoSz;
 		DWORD result;
-		if (!mrk::callRemoteFunction(
+		if (!callRemoteFunction(
 			procInfo.hProcess,
 			procInfo.hThread,
 			runtimeDataAddr,
 			remote_detail::loadMono,
 			&result,
 			/* 1 */ 	monoRelativePath,
-			/* 2 */		mrk::remote::stackalloc<MODULEINFO>(),
-			/* 3 */		mrk::remote::out(&hMono),
-			/* 4 */		mrk::remote::out(&monoBaseAddr),
-			/* 5 */		mrk::remote::out(&monoSz)
+			/* 2 */		remote::stackalloc<MODULEINFO>(),
+			/* 3 */		remote::out(&hMono),
+			/* 4 */		remote::out(&monoBaseAddr),
+			/* 5 */		remote::out(&monoSz)
 		) || result != 0) {
 			LOG("Failed to load mono into target process. Result: %lu", result);
 			return false;
@@ -47,7 +47,7 @@ namespace mrk::mono {
 		ZeroMemory(monoProcs, sizeof(MonoProcs));
 
 		// mono_image_open_from_data_with_name
-		if (!mrk::callRemoteFunction(
+		if (!callRemoteFunction(
 			procInfo.hProcess,
 			procInfo.hThread,
 			runtimeDataAddr,
@@ -55,7 +55,7 @@ namespace mrk::mono {
 			&result,
 			/* 1 */		hMono,
 			/* 2 */		"mono_image_open_from_data_with_name",
-			/* 3 */		mrk::remote::out(&monoProcs->mono_image_open_from_data_with_name)
+			/* 3 */		remote::out(&monoProcs->mono_image_open_from_data_with_name)
 		) || result != 0) {
 			LOG("Failed to resolve mono_image_open_from_data_with_name. Result: %lu", result);
 			return false;
@@ -80,43 +80,47 @@ namespace mrk::mono {
 		return true;
 	}
 
-	bool detail::resolveDoMonoImageOpen(
-		HANDLE hProc,
-		void* monoBaseAddr,
-		size_t monoSz,
-		MonoProcs* monoProcs
-	) {
-		// do_mono_image_open
-		// call    [rip+disp]
-		void* instruction = findRemotePattern(
-			hProc,
-			monoBaseAddr,
-			monoSz,
-			DO_MONO_IMAGE_OPEN_SIG,
-			sizeof(DO_MONO_IMAGE_OPEN_SIG) - 1,
-			DO_MONO_IMAGE_OPEN_MASK
-		);
+	namespace detail {
 
-		if (!instruction) {
-			LOG("Cant find do_mono_image_open call reference");
-			return false;
+		bool resolveDoMonoImageOpen(
+			HANDLE hProc,
+			void* monoBaseAddr,
+			size_t monoSz,
+			MonoProcs* monoProcs
+		) {
+			// do_mono_image_open
+			// call    [rip+disp]
+			void* instruction = findRemotePattern(
+				hProc,
+				monoBaseAddr,
+				monoSz,
+				DO_MONO_IMAGE_OPEN_SIG,
+				sizeof(DO_MONO_IMAGE_OPEN_SIG) - 1,
+				DO_MONO_IMAGE_OPEN_MASK
+			);
+
+			if (!instruction) {
+				LOG("Cant find do_mono_image_open call reference");
+				return false;
+			}
+
+			uintptr_t instructionAddr = reinterpret_cast<uintptr_t>(instruction);
+			LOG("Found do_mono_image_open call reference at 0x%p relv=0x%zX",
+				instruction,
+				instructionAddr - reinterpret_cast<uintptr_t>(monoBaseAddr));
+
+			int32_t disp;
+			if (!ReadProcessMemory(hProc, reinterpret_cast<void*>(instructionAddr + 1), &disp, 4, nullptr)) {
+				LOG("Failed to read disp from call reference. Error: %lu", GetLastError());
+				return false;
+			}
+			LOG("Disp=%d", disp);
+
+			monoProcs->do_mono_image_open = reinterpret_cast<do_mono_image_open_t>(instructionAddr + 5 + disp);
+			return true;
 		}
 
-		uintptr_t instructionAddr = reinterpret_cast<uintptr_t>(instruction);
-		LOG("Found do_mono_image_open call reference at 0x%p relv=0x%zX", 
-			instruction,
-			instructionAddr - reinterpret_cast<uintptr_t>(monoBaseAddr));
-
-		uint32_t disp;
-		if (!ReadProcessMemory(hProc, reinterpret_cast<void*>(instructionAddr + 1), &disp, 4, nullptr)) {
-			LOG("Failed to read disp from call reference. Error: %lu", GetLastError());
-			return false;
-		}
-		LOG("Disp=0x%X", disp);
-
-		monoProcs->do_mono_image_open = reinterpret_cast<do_mono_image_open_t>(instructionAddr + 5 + disp);
-		return true;
-	}
+	} // namespace detail
 
 	// Remote implementations
 	namespace remote_detail {
@@ -177,6 +181,6 @@ namespace mrk::mono {
 			return 0;
 		}
 
-	}
+	} // namespace remote_detail
 
-}
+} // namespace mrk::mono

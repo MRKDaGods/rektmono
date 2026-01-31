@@ -131,6 +131,7 @@
     <ClCompile Include="demo-main.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mono.cpp" />
+    <ClCompile Include="patch.cpp" />
     <ClCompile Include="remote\hook.cpp" />
     <ClCompile Include="remote\string_patch.cpp" />
     <ClCompile Include="remote\runtime.cpp" />
@@ -140,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="logger.h" />
     <ClInclude Include="mono.h" />
+    <ClInclude Include="patch.h" />
     <ClInclude Include="remote\hook.h" />
     <ClInclude Include="remote\winapi.h" />
     <ClInclude Include="remote\runtime_data.h" />

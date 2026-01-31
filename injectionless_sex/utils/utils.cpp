@@ -19,10 +19,10 @@ namespace mrk {
 	}
 
 	/// Gets the image base of the module containing addr
-	void* getImageBase(void* addr) {
+	void* getImageBase(void* addr, bool searchForward = true) {
 		uintptr_t base = reinterpret_cast<uintptr_t>(addr) & ~0xFFFFF;
 		for (unsigned i = 0; i < 0x100000; i += 0x10000) {
-			const uintptr_t potentialBase = base + i;
+			const uintptr_t potentialBase = searchForward ? base + i : base - i;
 			PIMAGE_DOS_HEADER dosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(potentialBase);
 
 			// Check if page is readable
@@ -45,6 +45,14 @@ namespace mrk {
 			}
 
 			return reinterpret_cast<void*>(potentialBase);
+		}
+
+		// Not found, try and look at the prev set of pages
+		// Case:
+		//		0x00007FF75DDF0000		<-- IMAGEBASE
+		//		0x00007FF75DE03D80		<-- me
+		if (searchForward) {
+			return getImageBase(addr, false);
 		}
 
 		return nullptr;
@@ -171,7 +179,7 @@ namespace mrk {
 			uintptr_t patternEnd = min(curPageAddr + regionSize, searchEnd);
 
 			VLOG("Searching region 0x%zX-0x%zX (size=0x%zX)",
-				curPageAddr, curPageAddr + regionSize, regionSize);
+				 curPageAddr, curPageAddr + regionSize, regionSize);
 
 			for (; patternStart + patternLen <= patternEnd; patternStart++) {
 				// Test pattern
