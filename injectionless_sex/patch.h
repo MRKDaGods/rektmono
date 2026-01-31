@@ -5,6 +5,14 @@
 
 namespace mrk::patch {
 
+	/// Trampoline indices
+	enum TRAMPOLINE_INDEX {
+		TRAMPOLINE_INDEX_do_mono_image_open = 0,
+		TRAMPOLINE_INDEX_mono_image_open_from_data_with_name = 1,
+
+		TRAMPOLINE_INDEX_COUNT
+	};
+
 	/// Allocates and applies the hooks
 	bool initialize(
 		const ProcessInfo& procInfo,
@@ -24,9 +32,20 @@ namespace mrk::patch {
 
 		bool applyHooks(
 			HANDLE hProc,
+			void* runtimeDataAddr,
 			const mono::MonoProcs* originalProcs,
 			const mono::MonoProcs& hookedProcs
 		);
+
+		bool writeTrampolineMapEntry(
+			HANDLE hProc,
+			void* runtimeDataAddr,
+			TRAMPOLINE_INDEX index,
+			void* trampoline
+		);
+
+		/// Debug
+		void printRemoteTrampolineMap(HANDLE hProc, void* runtimeDataAddr);
 	
 	}
 

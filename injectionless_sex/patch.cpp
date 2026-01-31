@@ -9,6 +9,8 @@ namespace mrk::patch {
 		void* runtimeDataAddr,
 		const mono::MonoProcs* monoProcs
 	) {
+		static_assert(TRAMPOLINE_INDEX_COUNT <= MRKAPI::TRAMPOLINE_MAP_SIZE, "Insufficient trampoline slots!");
+
 		if (!procInfo.hProcess || !procInfo.hThread || !runtimeDataAddr || !monoProcs) {
 			return false;
 		}
@@ -24,10 +26,13 @@ namespace mrk::patch {
 		LOG("hooked mono_image_open_from_data_with_name at 0x%p", static_cast<void*>(hookedProcs.mono_image_open_from_data_with_name));
 
 		LOG("Applying hooks...");
-		if (!detail::applyHooks(procInfo.hProcess, monoProcs, hookedProcs)) {
+		if (!detail::applyHooks(procInfo.hProcess, runtimeDataAddr, monoProcs, hookedProcs)) {
 			LOG("Failed to apply hooks");
 			return false;
 		}
+
+		// Are they correct?
+		detail::printRemoteTrampolineMap(procInfo.hProcess, runtimeDataAddr);
 
 		return true;
 	}
@@ -77,24 +82,106 @@ namespace mrk::patch {
 
 		bool applyHooks(
 			HANDLE hProc,
+			void* runtimeDataAddr,
 			const mono::MonoProcs* originalProcs,
 			const mono::MonoProcs& hookedProcs
 		) {
 			// do_mono_image_open
-			if (!remoteHook(hProc, originalProcs->do_mono_image_open, hookedProcs.do_mono_image_open, nullptr)) {
+			RemoteHookContext hookCtx;
+			if (!remoteHook(
+				hProc,
+				originalProcs->do_mono_image_open,
+				hookedProcs.do_mono_image_open,
+				&hookCtx
+			)) {
 				LOG("Failed to hook do_mono_image_open");
+				return false;
+			}
+
+			// Write trampoline
+			if (!writeTrampolineMapEntry(
+				hProc,
+				runtimeDataAddr,
+				TRAMPOLINE_INDEX_do_mono_image_open,
+				hookCtx.remote.trampoline
+			)) {
+				LOG("Failed to write trampoline map entry for do_mono_image_open");
 				return false;
 			}
 			LOG("Successfully hooked do_mono_image_open");
 
 			// mono_image_open_from_data_with_name
-			if (!remoteHook(hProc, originalProcs->mono_image_open_from_data_with_name, hookedProcs.mono_image_open_from_data_with_name, nullptr)) {
+			if (!remoteHook(
+				hProc,
+				originalProcs->mono_image_open_from_data_with_name,
+				hookedProcs.mono_image_open_from_data_with_name,
+				&hookCtx
+			)) {
 				LOG("Failed to hook mono_image_open_from_data_with_name");
+				return false;
+			}
+
+			// Write trampoline
+			if (!writeTrampolineMapEntry(
+				hProc,
+				runtimeDataAddr,
+				TRAMPOLINE_INDEX_mono_image_open_from_data_with_name,
+				hookCtx.remote.trampoline
+			)) {
+				LOG("Failed to write trampoline map entry for mono_image_open_from_data_with_name");
 				return false;
 			}
 			LOG("Successfully hooked mono_image_open_from_data_with_name");
 
 			return true;
+		}
+
+		bool writeTrampolineMapEntry(
+			HANDLE hProc,
+			void* runtimeDataAddr,
+			TRAMPOLINE_INDEX index,
+			void* trampoline
+		) {
+			if (!hProc || !runtimeDataAddr || index >= TRAMPOLINE_INDEX_COUNT) {
+				return false;
+			}
+
+			uintptr_t entryAddr = reinterpret_cast<uintptr_t>(runtimeDataAddr)
+				+ offsetof(RemoteRuntimeData, mrkapi)
+				+ offsetof(MRKAPI, trampolines)
+				+ (index * sizeof(void*));
+
+			LOG("Writing trampoline entry at 0x%zX index=%d", entryAddr, index);
+
+			return WriteProcessMemory(
+				hProc,
+				reinterpret_cast<void*>(entryAddr),
+				&trampoline,
+				sizeof(void*),
+				nullptr
+			);
+		}
+
+		void printRemoteTrampolineMap(HANDLE hProc, void* runtimeDataAddr) {
+			MRKAPI::TrampolineMap trampolines;
+			uintptr_t trampolinesAddr = reinterpret_cast<uintptr_t>(runtimeDataAddr)
+				+ offsetof(RemoteRuntimeData, mrkapi)
+				+ offsetof(MRKAPI, trampolines);
+
+			if (!ReadProcessMemory(
+				hProc,
+				reinterpret_cast<void*>(trampolinesAddr),
+				&trampolines,
+				sizeof(trampolines),
+				nullptr
+			)) {
+				return;
+			}
+
+			LOG("Remote Trampoline Map:");
+			for (size_t i = 0; i < MRKAPI::TRAMPOLINE_MAP_SIZE; i++) {
+				LOG("	[%zu]: 0x%p", i, trampolines[i]);
+			}
 		}
 
 	} // namespace detail
@@ -114,7 +201,11 @@ namespace mrk::patch {
 		) {
 			auto* runtimeData = REMOTE_HOOKED_RUNTIME_DATA();
 			runtimeData->winapi.MessageBoxA(nullptr, fname, "HOOKED do_mono_image_open", MB_OK);
-			return 0;
+
+			// Rbna yostor
+			return reinterpret_cast<decltype(&hookedDoMonoImageOpen)>(
+				runtimeData->mrkapi.trampolines[TRAMPOLINE_INDEX_do_mono_image_open])
+				(alc, fname, status, care_about_cli, care_about_pecoff, refonly, metadata_only, load_from_context);
 		}
 
 		REMOTE_HOOKED_FUNCTION(
@@ -128,7 +219,11 @@ namespace mrk::patch {
 		) {
 			auto* runtimeData = REMOTE_HOOKED_RUNTIME_DATA();
 			runtimeData->winapi.MessageBoxA(nullptr, name, "HOOKED mono_image_open_from_data_with_name", MB_OK);
-			return 0;
+			
+			// Rbna yostor x2
+			return reinterpret_cast<decltype(&hookedMonoImageOpenFromData)>(
+				runtimeData->mrkapi.trampolines[TRAMPOLINE_INDEX_mono_image_open_from_data_with_name])
+				(data, data_len, need_copy, status, refonly, name);
 		}
 
 	} // namespace remote_detail

@@ -373,6 +373,7 @@ namespace mrk {
 	RemoteRuntimeData createRuntimeData(HANDLE hProc) {
 		RemoteRuntimeData data{};
 		data.mrkapi.hProc = hProc;
+		ZeroMemory(data.mrkapi.trampolines, sizeof(data.mrkapi.trampolines));
 		return data;
 	}
 

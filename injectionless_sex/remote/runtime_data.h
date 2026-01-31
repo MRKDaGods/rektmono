@@ -22,7 +22,13 @@ namespace mrk {
 	struct MRKAPI {
 		/// Currently invalid in remote process
 		/// Use winapi.GetCurrentProcess()
-		HANDLE hProc; 
+		HANDLE hProc;
+
+		// Trampoline map
+		// 16 should be enough for now
+		static constexpr size_t TRAMPOLINE_MAP_SIZE = 16;
+		typedef void* TrampolineMap[TRAMPOLINE_MAP_SIZE];
+		TrampolineMap trampolines;
 	};
 
 	struct RemoteRuntimeData {
