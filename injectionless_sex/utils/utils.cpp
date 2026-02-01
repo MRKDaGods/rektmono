@@ -18,6 +18,16 @@ namespace mrk {
 		return mbi->Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE);
 	}
 
+	bool isAddressReadable(void* addr) {
+		MEMORY_BASIC_INFORMATION mbi;
+		ZeroMemory(&mbi, sizeof(mbi));
+		if (VirtualQuery(addr, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+			return false;
+		}
+
+		return isPageReadable(&mbi);
+	}
+
 	/// Gets the image base of the module containing addr
 	void* getImageBase(void* addr, bool searchForward = true) {
 		uintptr_t base = reinterpret_cast<uintptr_t>(addr) & ~0xFFFFF;
@@ -26,10 +36,7 @@ namespace mrk {
 			PIMAGE_DOS_HEADER dosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(potentialBase);
 
 			// Check if page is readable
-			MEMORY_BASIC_INFORMATION mbi;
-			ZeroMemory(&mbi, sizeof(mbi));
-			if (VirtualQuery(dosHeader, &mbi, sizeof(mbi)) != sizeof(mbi) ||
-				!isPageReadable(&mbi)) {
+			if (!isAddressReadable(dosHeader)) {
 				continue;
 			}
 

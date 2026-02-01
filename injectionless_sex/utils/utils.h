@@ -5,6 +5,7 @@
 
 namespace mrk {
 	
+	bool isAddressReadable(void* addr);
 	std::string getSectionName(void* memPtr);
 	void printFunctionDisassembly(void* function);
 	

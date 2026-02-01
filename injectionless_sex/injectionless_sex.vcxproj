@@ -136,6 +136,7 @@
     <ClCompile Include="patch.cpp" />
     <ClCompile Include="remote\alloc.cpp" />
     <ClCompile Include="remote\hook.cpp" />
+    <ClCompile Include="remote\runtime_data.cpp" />
     <ClCompile Include="remote\string_patch.cpp" />
     <ClCompile Include="remote\runtime.cpp" />
     <ClCompile Include="shellcode\shellcode.cpp" />

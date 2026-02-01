@@ -5,6 +5,7 @@
 #include "call.h"
 #include "winapi.h"
 #include "string_patch.h"
+#include "runtime_data.h"
 
 #include <Windows.h>
 #include <cstdint>
@@ -48,15 +49,26 @@ namespace mrk {
 	/// Allocates a persistent remote function for hooking, etc
 	/// Automatically patches string references to point to remote memory
 	bool allocatePersistentRemoteFunction(
-		HANDLE hProc, 
-		PersistentRemoteFunction function, 
-		void* runtimeDataAddr, 
+		HANDLE hProc,
+		PersistentRemoteFunction function,
+		void* runtimeDataAddr,
 		PersistentRemoteFunction* outFuncBase,
 		PersistentFunctionStringContext* outStringContext = nullptr
 	);
 
 	/// Debug purposes
 	void printFunctionDisassembly(void* function);
+
+	namespace detail {
+
+		/// Allocates local copies of our own API functions in the remote process runtime data
+		bool allocateLocalAPIFunctions(
+			HANDLE hProc,
+			RemoteRuntimeData& localData,
+			void* remoteDataAddr
+		);
+	
+	} // namespace detail
 
 	/// Check if we are supported on this architecture
 	inline bool isInjectionlessSexSupported() {
@@ -67,4 +79,4 @@ namespace mrk {
 #endif
 	}
 
-}
+} // namespace mrk

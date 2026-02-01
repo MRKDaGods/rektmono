@@ -188,7 +188,7 @@ namespace mrk::patch {
 
 	namespace remote_detail {
 
-		REMOTE_HOOKED_FUNCTION(
+		REMOTE_PERSISTENT_FUNCTION(
 			hookedDoMonoImageOpen,
 			void* alc,
 			const char* fname,
@@ -199,8 +199,29 @@ namespace mrk::patch {
 			int metadata_only,
 			int load_from_context
 		) {
-			auto* runtimeData = REMOTE_HOOKED_RUNTIME_DATA();
+			auto* runtimeData = REMOTE_PERSISTENT_RUNTIME_DATA();
 			runtimeData->winapi.MessageBoxA(nullptr, fname, "HOOKED do_mono_image_open", MB_OK);
+
+			// Read file ourselves
+			auto f = runtimeData->mrkapi.ReadFile(fname);
+			if (!f) {
+				runtimeData->winapi.MessageBoxA(nullptr, "Failed to read file!", "Error", MB_OK);
+				return 0;
+			}
+
+			// Print size and first 3 symbols
+			runtimeData->winapi.wsprintfA(
+				RUNTIME_STACK(0, char),
+				"File size: %u, first 3 bytes: %02X %02X %02X",
+				f->sz,
+				f->bytes[0],
+				f->bytes[1],
+				f->bytes[2]
+			);
+
+			runtimeData->winapi.MessageBoxA(nullptr, RUNTIME_STACK(0, char), "File Info", MB_OK);
+
+			// TODO: free file after use?
 
 			// Rbna yostor
 			return reinterpret_cast<decltype(&hookedDoMonoImageOpen)>(
@@ -208,7 +229,7 @@ namespace mrk::patch {
 				(alc, fname, status, care_about_cli, care_about_pecoff, refonly, metadata_only, load_from_context);
 		}
 
-		REMOTE_HOOKED_FUNCTION(
+		REMOTE_PERSISTENT_FUNCTION(
 			hookedMonoImageOpenFromData,
 			char* data,
 			unsigned int data_len,
@@ -217,8 +238,11 @@ namespace mrk::patch {
 			int refonly,
 			const char* name
 		) {
-			auto* runtimeData = REMOTE_HOOKED_RUNTIME_DATA();
+			auto* runtimeData = REMOTE_PERSISTENT_RUNTIME_DATA();
 			runtimeData->winapi.MessageBoxA(nullptr, name, "HOOKED mono_image_open_from_data_with_name", MB_OK);
+
+			// Transform data directly
+
 			
 			// Rbna yostor x2
 			return reinterpret_cast<decltype(&hookedMonoImageOpenFromData)>(

@@ -33,13 +33,13 @@ namespace mrk {
 #define REMOTE_ARG(index, type) reinterpret_cast<type>(__args__->args[index])
 #define REMOTE_RUNTIME_DATA_ARG() REMOTE_ARG(0, struct mrk::RemoteRuntimeData*)
 
-// For hooked functions that need embedded runtime data
+// For persistent functions that need embedded runtime data
 // The runtime data address will be patched into the function by allocatePersistentRemoteFunction
-#define REMOTE_HOOKED_FUNCTION(name, ...) \
+#define REMOTE_PERSISTENT_FUNCTION(name, ...) \
 		static uintptr_t __stdcall name(__VA_ARGS__)
 
-// Macro to access the embedded runtime data in hooked functions
-#define REMOTE_HOOKED_RUNTIME_DATA() mrk::__getRuntimeDataPtr()
+// Macro to access the embedded runtime data in persistent functions
+#define REMOTE_PERSISTENT_RUNTIME_DATA() mrk::__getRuntimeDataPtr()
 
 namespace mrk {
 	namespace detail {

@@ -1,6 +1,4 @@
 #include "runtime.h"
-#include "runtime_data.h"
-#include "args.h"
 #include "../logger.h"
 #include "../utils/utils.h"
 
@@ -387,6 +385,15 @@ namespace mrk {
 		}
 
 		RemoteRuntimeData runtimeData = createRuntimeData(hProc);
+
+		// Allocate local API functions
+		if (!detail::allocateLocalAPIFunctions(hProc, runtimeData, remoteAddr)) {
+			LOG("Failed to allocate local API functions");
+			VirtualFreeEx(hProc, remoteAddr, 0, MEM_RELEASE);
+			return false;
+		}
+
+		// Write runtime data
 		if (!WriteProcessMemory(hProc, remoteAddr, &runtimeData, sizeof(RemoteRuntimeData), nullptr)) {
 			LOG("Failed to write runtime data. Error: %lu", GetLastError());
 			return false;
@@ -407,10 +414,10 @@ namespace mrk {
 		LOG("Allocating persistent remote function, local addr=0x%p, runtimeData=0x%p", function, runtimeDataAddr);
 
 		// Find function size
-		// Just look for RET since we only have leaf functions
+		// Just look for PADDING
 		// TODO: Update this when IAT fixup is implemented
 		size_t funcSize = 0;
-		while (function[funcSize++] != 0xC3);
+		while (function[funcSize++] != 0xCC);
 		LOG("Function size=%zu", funcSize);
 
 		printFunctionDisassembly(function);
@@ -423,15 +430,21 @@ namespace mrk {
 		// Compiler already hardcodes the offsets so just look for DIEAFIFI..
 		// Assume RemoteRuntimeData never exceeds FFFFFFFF bytes
 		static_assert(sizeof(RemoteRuntimeData) <= 0xFFFFFFFF, "RemoteRuntimeData too big lol");
-
 		constexpr uintptr_t upperPlaceholder = EMBEDDED_RUNTIME_DATA_PLACEHOLDER >> 32; // 4 bytes right
-		for (size_t i = 0; i <= funcSize - sizeof(uintptr_t); i++) {
-			uintptr_t* potentialPlaceholder = reinterpret_cast<uintptr_t*>(funcCopy + i);
-			if ((*potentialPlaceholder >> 32) == upperPlaceholder) {
-				uintptr_t delta = *potentialPlaceholder - EMBEDDED_RUNTIME_DATA_PLACEHOLDER;
-				uintptr_t newDataAddr = reinterpret_cast<uintptr_t>(runtimeDataAddr) + delta;
-				LOG("Found embedded runtime data placeholder at offset 0x%zX, patching with 0x%zX", i, newDataAddr);
-				*potentialPlaceholder = newDataAddr;
+
+		if (funcSize >= sizeof(uintptr_t)) {
+			for (size_t i = 0; i + sizeof(uintptr_t) <= funcSize; i++) {
+				uintptr_t* potentialPlaceholder = reinterpret_cast<uintptr_t*>(funcCopy + i);
+				if (!isAddressReadable(static_cast<void*>(potentialPlaceholder))) {
+					continue;
+				}
+
+				if ((*potentialPlaceholder >> 32) == upperPlaceholder) {
+					uintptr_t delta = *potentialPlaceholder - EMBEDDED_RUNTIME_DATA_PLACEHOLDER;
+					uintptr_t newDataAddr = reinterpret_cast<uintptr_t>(runtimeDataAddr) + delta;
+					LOG("Found embedded runtime data placeholder at offset 0x%zX, patching with 0x%zX", i, newDataAddr);
+					*potentialPlaceholder = newDataAddr;
+				}
 			}
 		}
 
@@ -484,4 +497,22 @@ namespace mrk {
 		return true;
 	}
 
-}
+	namespace detail {
+
+		bool allocateLocalAPIFunctions(
+			HANDLE hProc,
+			RemoteRuntimeData& localData,
+			void* remoteDataAddr
+		) {
+			// Only ReadFile for now
+			return allocatePersistentRemoteFunction(
+				hProc,
+				reinterpret_cast<PersistentRemoteFunction>(&mrk::remote_detail::ReadFile),
+				remoteDataAddr,
+				reinterpret_cast<PersistentRemoteFunction*>(&localData.mrkapi.ReadFile)
+			);
+		}
+
+	} // namespace detail
+
+} // namespace mrk

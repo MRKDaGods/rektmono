@@ -52,7 +52,7 @@ namespace mrk::patch {
 	namespace remote_detail {
 
 		/// Hooked do_mono_image_open
-		REMOTE_HOOKED_FUNCTION(
+		REMOTE_PERSISTENT_FUNCTION(
 			hookedDoMonoImageOpen,
 			void* alc,
 			const char* fname,
@@ -65,7 +65,7 @@ namespace mrk::patch {
 		);
 
 		/// Hooked mono_image_open_from_data_with_name
-		REMOTE_HOOKED_FUNCTION(
+		REMOTE_PERSISTENT_FUNCTION(
 			hookedMonoImageOpenFromData,
 			char* data,
 			unsigned int data_len,
