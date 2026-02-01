@@ -504,13 +504,27 @@ namespace mrk {
 			RemoteRuntimeData& localData,
 			void* remoteDataAddr
 		) {
-			// Only ReadFile for now
-			return allocatePersistentRemoteFunction(
-				hProc,
-				reinterpret_cast<PersistentRemoteFunction>(&mrk::remote_detail::ReadFile),
-				remoteDataAddr,
-				reinterpret_cast<PersistentRemoteFunction*>(&localData.mrkapi.ReadFile)
-			);
+			// ReadFile			<----- START
+			// ReadFile2
+			// .....
+			// END OF MRKAPI	<----- END
+
+			for (uintptr_t offset = offsetof(MRKAPI, ReadFile); offset < sizeof(MRKAPI); offset += sizeof(void*)) {
+				PersistentRemoteFunction* funcPtr = reinterpret_cast<PersistentRemoteFunction*>(
+					reinterpret_cast<uintptr_t>(&localData.mrkapi) + offset
+				);
+				if (!allocatePersistentRemoteFunction(
+					hProc,
+					*funcPtr,
+					remoteDataAddr,
+					funcPtr
+				)) {
+					LOG("Failed to allocate persistent remote function for MRKAPI offset 0x%zX", offset);
+					return false;
+				}
+			}
+
+			return true;
 		}
 
 	} // namespace detail

@@ -7,26 +7,28 @@
 #include <Psapi.h>
 #include <cstdint>
 
-#define DECLARE_API_FUNC(funcname) decltype(&funcname) funcname = &::funcname
+#define DECLARE_WINAPI_FUNC(funcname) decltype(&funcname) funcname = &::funcname
+#define DECLARE_MRKAPI_FUNC(funcname) decltype(&mrk::remote_detail::funcname) funcname = &mrk::remote_detail::funcname
 
 namespace mrk {
 
 	struct WinAPI {
-		DECLARE_API_FUNC(LoadLibraryA);
-		DECLARE_API_FUNC(GetProcAddress);
-		DECLARE_API_FUNC(K32GetModuleInformation);
-		DECLARE_API_FUNC(GetCurrentProcess);
-		DECLARE_API_FUNC(MessageBoxA);
-		DECLARE_API_FUNC(wsprintfA);
-		DECLARE_API_FUNC(CreateFileA);
-		DECLARE_API_FUNC(GetFileSizeEx);
-		DECLARE_API_FUNC(ReadFile);
-		DECLARE_API_FUNC(CloseHandle);
-		DECLARE_API_FUNC(VirtualAlloc);
-		DECLARE_API_FUNC(VirtualFree);
+		DECLARE_WINAPI_FUNC(LoadLibraryA);
+		DECLARE_WINAPI_FUNC(GetProcAddress);
+		DECLARE_WINAPI_FUNC(K32GetModuleInformation);
+		DECLARE_WINAPI_FUNC(GetCurrentProcess);
+		DECLARE_WINAPI_FUNC(MessageBoxA);
+		DECLARE_WINAPI_FUNC(wsprintfA);
+		DECLARE_WINAPI_FUNC(CreateFileA);
+		DECLARE_WINAPI_FUNC(GetFileSizeEx);
+		DECLARE_WINAPI_FUNC(ReadFile);
+		DECLARE_WINAPI_FUNC(CloseHandle);
+		DECLARE_WINAPI_FUNC(VirtualAlloc);
+		DECLARE_WINAPI_FUNC(VirtualFree);
 	};
 
 	namespace remote_detail {
+
 		/* API */
 		struct File {
 			uint8_t* bytes;
@@ -34,7 +36,8 @@ namespace mrk {
 		};
 
 		File* __stdcall ReadFile(const char* path);
-	}
+
+	} // namespace remote_detail
 
 	struct MRKAPI {
 		/// Currently invalid in remote process
@@ -48,7 +51,7 @@ namespace mrk {
 		TrampolineMap trampolines;
 
 		/// REMOTE_PERSISTENT_FUNCTION
-		decltype(&mrk::remote_detail::ReadFile) ReadFile = &::mrk::remote_detail::ReadFile;
+		DECLARE_MRKAPI_FUNC(ReadFile);
 	};
 
 	struct RemoteRuntimeData {
