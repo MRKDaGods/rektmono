@@ -128,10 +128,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="backend\kernel.cpp" />
+    <ClCompile Include="backend\user.cpp" />
     <ClCompile Include="demo-main.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mono.cpp" />
     <ClCompile Include="patch.cpp" />
+    <ClCompile Include="remote\alloc.cpp" />
     <ClCompile Include="remote\hook.cpp" />
     <ClCompile Include="remote\string_patch.cpp" />
     <ClCompile Include="remote\runtime.cpp" />
@@ -139,6 +142,7 @@
     <ClCompile Include="utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="backend\backend.h" />
     <ClInclude Include="logger.h" />
     <ClInclude Include="mono.h" />
     <ClInclude Include="patch.h" />
@@ -152,6 +156,7 @@
     <ClInclude Include="remote\runtime.h" />
     <ClInclude Include="shellcode\shellcode.h" />
     <ClInclude Include="utils\nmd_assembly.h" />
+    <ClInclude Include="utils\traits.h" />
     <ClInclude Include="utils\utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
