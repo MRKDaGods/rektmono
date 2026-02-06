@@ -30,7 +30,7 @@ namespace mrk {
 	}
 
 	RemoteBuffer::RemoteBuffer(HANDLE hProc, const char* str)
-		: hProc_(hProc), remoteAddr_(nullptr), size_(0) {
+		: hProc_(hProc), remoteAddr_(nullptr), size_(0), localAddr_(nullptr) {
 		if (str && hProc) {
 			size_ = strlen(str) + 1;
 
@@ -48,7 +48,7 @@ namespace mrk {
 	}
 
 	RemoteBuffer::RemoteBuffer(HANDLE hProc, const wchar_t* str)
-		: hProc_(hProc), remoteAddr_(nullptr), size_(0) {
+		: hProc_(hProc), remoteAddr_(nullptr), size_(0), localAddr_(nullptr) {
 		if (str && hProc) {
 			size_ = (wcslen(str) + 1) * sizeof(wchar_t);
 

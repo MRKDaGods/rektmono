@@ -205,28 +205,31 @@ namespace mrk::patch {
 			// Read file ourselves
 			auto f = runtimeData->mrkapi.ReadFile(fname);
 			if (!f) {
-				runtimeData->winapi.MessageBoxA(nullptr, "Failed to read file!", "Error", MB_OK);
+				// runtimeData->winapi.MessageBoxA(nullptr, "Failed to read file!", "Error", MB_OK);
 				return 0;
 			}
 
-			// Print size and first 3 symbols
-			runtimeData->winapi.wsprintfA(
-				RUNTIME_STACK(0, char),
-				"File size: %u, first 3 bytes: %02X %02X %02X",
-				f->sz,
-				f->bytes[0],
-				f->bytes[1],
-				f->bytes[2]
-			);
+			// Simple xor for test
+			// ty injectionless_sex for helping out with realkernelsex
+			// hot shit
 
-			runtimeData->winapi.MessageBoxA(nullptr, RUNTIME_STACK(0, char), "File Info", MB_OK);
+			/*const char* TEST_XOR_KEY = "ammar123";
+			for (unsigned i = 0; i < f->sz; i++) {
+				uint8_t* byte = f->bytes + i;
+				
+				for (unsigned j = 0; j < sizeof(TEST_XOR_KEY); j++) {
+					*byte ^= TEST_XOR_KEY[j];
+				}
+			}*/
 
-			// TODO: free file after use?
-
-			// Rbna yostor
-			return reinterpret_cast<decltype(&hookedDoMonoImageOpen)>(
+			// Invoke hookedMonoImageOpenFromData
+			/*return reinterpret_cast<decltype(&hookedDoMonoImageOpen)>(
 				runtimeData->mrkapi.trampolines[TRAMPOLINE_INDEX_do_mono_image_open])
-				(alc, fname, status, care_about_cli, care_about_pecoff, refonly, metadata_only, load_from_context);
+				(alc, fname, status, care_about_cli, care_about_pecoff, refonly, metadata_only, load_from_context);*/
+
+			return reinterpret_cast<decltype(&hookedMonoImageOpenFromData)>(
+				runtimeData->mrkapi.trampolines[TRAMPOLINE_INDEX_mono_image_open_from_data_with_name])
+				((char*)f->bytes, f->sz, 0, status, refonly, fname);
 		}
 
 		REMOTE_PERSISTENT_FUNCTION(
