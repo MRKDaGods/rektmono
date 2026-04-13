@@ -24,10 +24,10 @@ REMOTE_FUNCTION(CustomRemoteFunction) {
 }
 
 int demo_main() {
-	LOG("Injectionless sex - %s", __TIMESTAMP__);
+	LOG("Injectionless - %s", __TIMESTAMP__);
 
-	if (!isInjectionlessSexSupported()) {
-		LOG("Injectionless sex is not supported on this architecture.");
+	if (!isInjectionlessSupported()) {
+		LOG("Injectionless is not supported on this architecture.");
 		return 1;
 	}
 

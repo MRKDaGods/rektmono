@@ -22,7 +22,7 @@
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{d336fa8d-fa6c-48a2-b9fe-8ecef312b7ac}</ProjectGuid>
-    <RootNamespace>injectionlesssex</RootNamespace>
+    <RootNamespace>injectionless</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

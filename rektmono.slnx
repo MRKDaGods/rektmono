@@ -11,7 +11,7 @@
   <Project Path="helloworld/helloworld.vcxproj" Id="3a623551-144e-4c9d-a124-4240e6d928ee">
     <BuildType Solution="Debug|x64" Project="Release" />
   </Project>
-  <Project Path="injectionless_sex/injectionless_sex.vcxproj" Id="d336fa8d-fa6c-48a2-b9fe-8ecef312b7ac" />
+  <Project Path="injectionless/injectionless.vcxproj" Id="d336fa8d-fa6c-48a2-b9fe-8ecef312b7ac" />
   <Project Path="loader/loader.vcxproj" Id="034241e2-cfd8-474a-97c9-2bb0189271b7">
     <BuildType Solution="Debug|x64" Project="Release" />
   </Project>

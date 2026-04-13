@@ -11,10 +11,10 @@
 #define MONO_RELV_PATH "MonoBleedingEdge\\EmbedRuntime\\mono-2.0-bdwgc.dll"
 
 int main() {
-	LOG("Injectionless sex - %s", __TIMESTAMP__);
+	LOG("Injectionless - %s", __TIMESTAMP__);
 
-	if (!mrk::isInjectionlessSexSupported()) {
-		LOG("Injectionless sex is not supported on this architecture.");
+	if (!mrk::isInjectionlessSupported()) {
+		LOG("Injectionless is not supported on this architecture.");
 		return 1;
 	}
 

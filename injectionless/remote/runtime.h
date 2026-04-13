@@ -71,7 +71,7 @@ namespace mrk {
 	} // namespace detail
 
 	/// Check if we are supported on this architecture
-	inline bool isInjectionlessSexSupported() {
+	inline bool isInjectionlessSupported() {
 #ifdef _M_X64
 		return true;
 #else

@@ -210,7 +210,7 @@ namespace mrk::patch {
 			}
 
 			// Simple xor for test
-			// ty injectionless_sex for helping out with realkernelsex
+			// ty injectionless for helping out
 			// hot shit
 
 			/*const char* TEST_XOR_KEY = "ammar123";
